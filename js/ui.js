@@ -1,0 +1,296 @@
+const UI = {
+  toast(message, type = 'info', duration = 2500) {
+    const existing = document.querySelector('.toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.transition = 'opacity 0.25s';
+      toast.style.opacity = '0';
+      setTimeout(() => toast.remove(), 250);
+    }, duration);
+  },
+
+  confirm(message) {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">确认操作</div>
+            <button class="modal-close" data-action="close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <p style="font-size: 15px; color: var(--text-primary); line-height: 1.7;">${UI.escapeHtml(message)}</p>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-action="cancel">取消</button>
+            <button class="btn btn-danger" data-action="confirm">确认</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const close = (result) => {
+        backdrop.remove();
+        resolve(result);
+      };
+
+      backdrop.querySelector('[data-action="close"]').onclick = () => close(false);
+      backdrop.querySelector('[data-action="cancel"]').onclick = () => close(false);
+      backdrop.querySelector('[data-action="confirm"]').onclick = () => close(true);
+      backdrop.onclick = (e) => {
+        if (e.target === backdrop) close(false);
+      };
+    });
+  },
+
+  prompt(title, defaultValue = '', placeholder = '') {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">${UI.escapeHtml(title)}</div>
+            <button class="modal-close" data-action="close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <input type="text" class="form-input" id="prompt-input" value="${UI.escapeAttr(defaultValue)}" placeholder="${UI.escapeAttr(placeholder)}" />
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" data-action="cancel">取消</button>
+            <button class="btn btn-primary" data-action="confirm">确定</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const input = backdrop.querySelector('#prompt-input');
+      input.focus();
+      input.select();
+
+      const close = (result) => {
+        backdrop.remove();
+        resolve(result);
+      };
+
+      backdrop.querySelector('[data-action="close"]').onclick = () => close(null);
+      backdrop.querySelector('[data-action="cancel"]').onclick = () => close(null);
+      backdrop.querySelector('[data-action="confirm"]').onclick = () => close(input.value.trim());
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') close(input.value.trim());
+        if (e.key === 'Escape') close(null);
+      };
+      backdrop.onclick = (e) => {
+        if (e.target === backdrop) close(null);
+      };
+    });
+  },
+
+  createModal(content, maxWidthClass = '') {
+    const backdrop = document.createElement('div');
+    backdrop.className = 'modal-backdrop';
+    backdrop.innerHTML = `<div class="modal ${maxWidthClass}"></div>`;
+    const modal = backdrop.querySelector('.modal');
+    modal.innerHTML = content;
+    document.body.appendChild(backdrop);
+
+    backdrop.onclick = (e) => {
+      if (e.target === backdrop) backdrop.remove();
+    };
+    const closeBtn = modal.querySelector('[data-close]');
+    if (closeBtn) closeBtn.onclick = () => backdrop.remove();
+
+    return { backdrop, modal, close: () => backdrop.remove() };
+  },
+
+  escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  },
+
+  escapeAttr(text) {
+    if (!text) return '';
+    return String(text).replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+  },
+
+  formatTimestamp(ts) {
+    const date = new Date(ts);
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  },
+
+  formatRelativeTime(ts) {
+    const now = Date.now();
+    const diff = now - ts;
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    if (diff < minute) return '刚刚';
+    if (diff < hour) return Math.floor(diff / minute) + '分钟前';
+    if (diff < day) return Math.floor(diff / hour) + '小时前';
+    if (diff < 30 * day) return Math.floor(diff / day) + '天前';
+    return this.formatTimestamp(ts).split(' ')[0];
+  },
+
+  truncate(text, maxLen = 150) {
+    if (!text) return '';
+    if (text.length <= maxLen) return text;
+    return text.substring(0, maxLen) + '...';
+  },
+
+  getTypeLabel(type) {
+    const labels = { text: '文本', link: '链接', image: '图片', code: '代码' };
+    return labels[type] || '文本';
+  },
+
+  getTypeIcon(type) {
+    const icons = { text: '📝', link: '🔗', image: '🖼️', code: '💻' };
+    return icons[type] || '📝';
+  },
+
+  debounce(fn, delay = 300) {
+    let timer = null;
+    return function(...args) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+  },
+
+  copyToClipboard(text) {
+    return new Promise(async (resolve) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        resolve(true);
+      } catch (e) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          resolve(true);
+        } catch {
+          resolve(false);
+        } finally {
+          document.body.removeChild(textarea);
+        }
+      }
+    });
+  },
+
+  downloadFile(filename, content, mimeType = 'text/plain') {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
+
+  sendMessage(action, payload = {}) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action, payload }, (response) => {
+        resolve(response || { success: false, error: 'no-response' });
+      });
+    });
+  },
+
+  generateQuoteCard(clip) {
+    const lines = [];
+    lines.push('> 「' + UI.truncate(clip.content || clip.title || '无内容', 100) + '」');
+    lines.push('>');
+    lines.push('> —— 来自 ' + (clip.sourceApp || '未知来源') + (clip.sourceUrl ? ` (${clip.sourceUrl})` : ''));
+    lines.push('> 保存于 ' + UI.formatTimestamp(clip.timestamp));
+    if (clip.tags && clip.tags.length > 0) {
+      lines.push('> 标签: ' + clip.tags.map(t => '#' + t).join(' '));
+    }
+    return lines.join('\n');
+  },
+
+  maskSensitive(text, sensitiveWords) {
+    if (!text || !sensitiveWords || sensitiveWords.length === 0) return UI.escapeHtml(text);
+    let result = UI.escapeHtml(text);
+    for (const word of sensitiveWords) {
+      const escaped = UI.escapeHtml(word);
+      const regex = new RegExp('(' + escaped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[:=]\\s*[^\\s<]+)', 'gi');
+      result = result.replace(regex, '<span class="sensitive-mask" title="敏感内容已遮罩，点击/悬停查看">$1</span>');
+    }
+    return result;
+  },
+
+  highlightMatches(text, query) {
+    const escaped = UI.escapeHtml(text);
+    if (!query) return escaped;
+    const regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    return escaped.replace(regex, '<mark style="background: #fef08a; padding: 0 2px; border-radius: 2px;">$1</mark>');
+  }
+};
+
+const Nav = {
+  init(currentPage) {
+    const sidebar = document.querySelector('.sidebar');
+    if (!sidebar) return;
+
+    const items = [
+      { page: 'timeline', icon: '⏱️', label: '时间轴', href: 'timeline.html' },
+      { page: 'favorites', icon: '⭐', label: '收藏夹', href: 'favorites.html' },
+      { page: 'tags', icon: '🏷️', label: '标签管理', href: 'tags.html' },
+      { page: 'search', icon: '🔍', label: '搜索', href: 'search.html' },
+      { page: 'settings', icon: '⚙️', label: '隐私设置', href: 'settings.html' },
+      { page: 'cleanup', icon: '🗑️', label: '清理中心', href: 'cleanup.html' }
+    ];
+
+    let totalClips = 0;
+    UI.sendMessage('getClips').then(r => {
+      if (r.success) totalClips = r.data.length;
+      render();
+    });
+
+    function render() {
+      const navMenu = sidebar.querySelector('.nav-menu') || document.createElement('div');
+      navMenu.className = 'nav-menu';
+      navMenu.innerHTML = items.map(item => {
+        const isActive = item.page === currentPage ? 'active' : '';
+        const badge = item.page === 'timeline' && totalClips > 0
+          ? `<span class="nav-badge">${totalClips}</span>`
+          : item.page === 'favorites'
+            ? '' : '';
+        return `<div class="nav-item ${isActive}" data-href="${item.href}">
+          <span class="nav-icon">${item.icon}</span>
+          <span>${item.label}</span>
+          ${badge}
+        </div>`;
+      }).join('');
+
+      navMenu.querySelectorAll('.nav-item').forEach(el => {
+        el.onclick = () => {
+          const href = el.getAttribute('data-href');
+          window.location.href = href;
+        };
+      });
+
+      if (!sidebar.querySelector('.nav-menu')) {
+        sidebar.appendChild(navMenu);
+      }
+    }
+  },
+
+  getParam(name) {
+    const params = new URLSearchParams(window.location.search);
+    return params.get(name);
+  }
+};

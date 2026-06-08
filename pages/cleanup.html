@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>清理中心 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">🗑️ 清理中心</h1>
+        <p class="page-subtitle">管理存储空间，清理历史数据</p>
+      </div>
+
+      <div class="content-area">
+        <div class="stats-grid" id="storageStats"></div>
+
+        <div class="card">
+          <div class="settings-section-title">🧹 快速清理</div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">清理7天前的未收藏内容</div>
+              <div class="settings-desc">删除1周前创建的未收藏、未置顶记录</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" data-clean="7d">清理</button>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">清理30天前的未收藏内容</div>
+              <div class="settings-desc">删除1个月前创建的未收藏、未置顶记录</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" data-clean="30d">清理</button>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">清理复制次数为1的内容</div>
+              <div class="settings-desc">删除从未使用过的一次性记录</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" data-clean="copy1">清理</button>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">清理图片内容</div>
+              <div class="settings-desc">删除所有图片类型的记录（图片占用空间较大）</div>
+            </div>
+            <button class="btn btn-warning btn-sm" data-clean="images">清理</button>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">清空所有未收藏内容</div>
+              <div class="settings-desc">删除所有未收藏、未置顶的记录</div>
+            </div>
+            <button class="btn btn-warning btn-sm" data-clean="unfav">清空</button>
+          </div>
+
+          <div class="settings-row" style="padding-top:16px;border-top:1px solid var(--border);">
+            <div class="settings-label">
+              <div class="settings-name" style="color:var(--danger);">⚠️ 清空所有数据</div>
+              <div class="settings-desc" style="color:var(--danger);">删除所有记录，包括收藏和置顶！此操作不可撤销！</div>
+            </div>
+            <button class="btn btn-danger btn-sm" data-clean="all">全部清空</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="settings-section-title">📤 导出与备份</div>
+
+          <div class="form-group">
+            <label class="form-label">导出范围</label>
+            <select class="form-select" id="exportScope" style="width:200px;">
+              <option value="all">全部内容</option>
+              <option value="favorites">仅收藏内容</option>
+              <option value="pinned">仅置顶内容</option>
+              <option value="tagged">有标签的内容</option>
+              <option value="recent">最近7天</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">导出格式</label>
+            <select class="form-select" id="exportFormat" style="width:200px;">
+              <option value="json">JSON 格式（完整数据）</option>
+              <option value="markdown">Markdown 格式</option>
+              <option value="txt">纯文本格式</option>
+              <option value="csv">CSV 表格格式</option>
+              <option value="html">HTML 网页</option>
+            </select>
+          </div>
+
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" id="exportBtn">📤 导出数据</button>
+            <button class="btn btn-secondary" id="exportSelectedBtn">🎯 导出精选集</button>
+          </div>
+          <div class="form-hint" style="margin-top:10px;">导出精选集：将弹出选择器，手动挑选要导出的内容</div>
+        </div>
+
+        <div class="card">
+          <div class="settings-section-title">📊 数据分析</div>
+          <div id="analysisArea"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/cleanup.js"></script>
+</body>
+</html>

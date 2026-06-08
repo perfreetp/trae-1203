@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>隐私设置 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">⚙️ 隐私设置</h1>
+        <p class="page-subtitle">配置采集规则、隐私保护和快捷键</p>
+      </div>
+
+      <div class="content-area">
+        <div class="card">
+          <div class="settings-section-title">🎯 采集设置</div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">启用采集</div>
+              <div class="settings-desc">开启后自动记录复制的内容，可随时暂停</div>
+            </div>
+            <div class="toggle-switch" id="toggleEnabled"></div>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">自动检测代码片段</div>
+              <div class="settings-desc">智能识别复制的代码并标记为代码类型</div>
+            </div>
+            <div class="toggle-switch" id="toggleDetectCode"></div>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">合并相似内容</div>
+              <div class="settings-desc">将相似的内容自动合并，保留最近版本并记录历史</div>
+            </div>
+            <div class="toggle-switch" id="toggleMerge"></div>
+          </div>
+
+          <div class="settings-row" id="thresholdRow">
+            <div class="settings-label">
+              <div class="settings-name">相似度阈值</div>
+              <div class="settings-desc">相似度超过此值的内容将被合并（0-1之间）</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <input type="range" id="thresholdSlider" min="0.5" max="1" step="0.05" value="0.85" style="width:150px;">
+              <span id="thresholdValue" style="font-weight:600;color:var(--primary);min-width:45px;">0.85</span>
+            </div>
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">最多保留条目</div>
+              <div class="settings-desc">超过此数量将自动删除最旧的未收藏内容</div>
+            </div>
+            <input type="number" class="form-input" id="maxClips" style="width:140px;" min="100" max="50000">
+          </div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">保留天数</div>
+              <div class="settings-desc">超过此天数的未收藏内容将被自动清理（0表示永久保留）</div>
+            </div>
+            <input type="number" class="form-input" id="keepDays" style="width:140px;" min="0" max="3650">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="settings-section-title">🔒 隐私保护</div>
+
+          <div class="settings-row">
+            <div class="settings-label">
+              <div class="settings-name">敏感词遮罩</div>
+              <div class="settings-desc">在预览时自动遮蔽包含敏感词的内容</div>
+            </div>
+            <div class="toggle-switch" id="toggleMask"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">敏感词列表 <span style="font-weight:400;color:var(--text-muted);font-size:12px;">（按回车或逗号分隔添加）</span></label>
+            <div class="tag-input-area" id="sensitiveWordsArea">
+              <input type="text" class="tag-input" id="sensitiveInput" placeholder="输入敏感词后按回车">
+            </div>
+            <div class="form-hint">系统将自动遮蔽类似"密码: xxx"、"token=xxx"格式的敏感信息</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">黑名单网站 <span style="font-weight:400;color:var(--text-muted);font-size:12px;">（不记录这些网站复制的内容）</span></label>
+            <div class="blacklist-input-row">
+              <input type="text" class="form-input" id="blacklistInput" placeholder="输入网站域名，如：facebook.com">
+              <button class="btn btn-secondary" id="addBlacklistBtn">添加</button>
+            </div>
+            <div id="blacklistTags"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="settings-section-title">⌨️ 快捷键</div>
+          <div style="font-size:13px;color:var(--text-secondary);line-height:2.2;">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light);">
+              <span>暂停/开始采集</span>
+              <span><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">P</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light);">
+              <span>打开搜索页面</span>
+              <span><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">F</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light);">
+              <span>快速粘贴第1个置顶/收藏</span>
+              <span><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">1</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-light);">
+              <span>快速粘贴第2个置顶/收藏</span>
+              <span><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">2</span></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;">
+              <span>快速粘贴第3个置顶/收藏</span>
+              <span><span class="kbd">Ctrl</span> + <span class="kbd">Shift</span> + <span class="kbd">3</span></span>
+            </div>
+            <div class="form-hint" style="margin-top:12px;">提示：可在 Chrome 扩展管理页面 (chrome://extensions/shortcuts) 自定义快捷键</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px;">
+          <button class="btn btn-secondary" id="resetBtn">恢复默认</button>
+          <button class="btn btn-primary" id="saveBtn">💾 保存设置</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/settings.js"></script>
+</body>
+</html>

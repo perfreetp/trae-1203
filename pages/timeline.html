@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>时间轴 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+      <div class="sidebar-footer">
+        <button class="footer-btn" id="exportBtn">📤 导出</button>
+        <button class="footer-btn" id="pauseToggle">⏸️ 采集</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">⏱️ 时间轴</h1>
+        <p class="page-subtitle">按时间顺序查看所有剪切记录，点击卡片复制内容</p>
+      </div>
+
+      <div class="content-area">
+        <div class="stats-grid" id="statsGrid"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">筛选与排序</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div class="layout-toggle">
+                <button class="layout-btn active" data-layout="grid">▦ 网格</button>
+                <button class="layout-btn" data-layout="list">≡ 列表</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="selectModeBtn">☑️ 批量选择</button>
+            </div>
+          </div>
+
+          <div class="filters-bar">
+            <span class="filter-chip active" data-filter-type="all">全部类型</span>
+            <span class="filter-chip" data-filter-type="text">📝 文本</span>
+            <span class="filter-chip" data-filter-type="link">🔗 链接</span>
+            <span class="filter-chip" data-filter-type="code">💻 代码</span>
+            <span class="filter-chip" data-filter-type="image">🖼️ 图片</span>
+            <span style="width:1px;height:24px;background:var(--border);margin:0 4px;"></span>
+            <span class="filter-chip" data-filter-fav="only">⭐ 仅收藏</span>
+            <span class="filter-chip" data-filter-pin="only">📌 仅置顶</span>
+          </div>
+
+          <div id="sourcesFilter" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"></div>
+        </div>
+
+        <div id="bulkActions" class="bulk-actions" style="display:none;">
+          <span class="bulk-actions-count">已选择 <span id="selectedCount">0</span> 项</span>
+          <div class="bulk-actions-spacer"></div>
+          <button class="btn btn-secondary btn-sm" id="bulkFavBtn">⭐ 收藏</button>
+          <button class="btn btn-secondary btn-sm" id="bulkTagBtn">🏷️ 加标签</button>
+          <button class="btn btn-danger btn-sm" id="bulkDelBtn">🗑️ 删除</button>
+          <button class="btn btn-ghost btn-sm" id="cancelSelectBtn">取消选择</button>
+        </div>
+
+        <div id="timelineContent"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/timeline.js"></script>
+</body>
+</html>

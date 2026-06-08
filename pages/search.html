@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>搜索 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">🔍 全文搜索</h1>
+        <p class="page-subtitle">在所有剪切记录中搜索内容、标签和来源</p>
+      </div>
+
+      <div class="content-area">
+        <div class="search-header">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="searchInput" placeholder="输入关键词搜索（支持内容、标题、标签、来源网址...）" autofocus>
+          </div>
+          <button class="btn btn-secondary" id="similarBtn">🔄 查找相似内容</button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">高级筛选</div>
+            <button class="btn btn-ghost btn-sm" id="resetFilters">重置筛选</button>
+          </div>
+
+          <div class="filters-bar">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;">
+              <span style="font-weight:500;color:var(--text-secondary);font-size:13px;margin-right:4px;">类型:</span>
+              <span class="filter-chip active" data-type="all">全部</span>
+              <span class="filter-chip" data-type="text">📝 文本</span>
+              <span class="filter-chip" data-type="link">🔗 链接</span>
+              <span class="filter-chip" data-type="code">💻 代码</span>
+              <span class="filter-chip" data-type="image">🖼️ 图片</span>
+            </div>
+          </div>
+
+          <div class="filters-bar" style="margin-top:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%;">
+              <span style="font-weight:500;color:var(--text-secondary);font-size:13px;margin-right:4px;">其他:</span>
+              <span class="filter-chip" data-fav="1">⭐ 仅收藏</span>
+              <span class="filter-chip" data-pin="1">📌 仅置顶</span>
+              <span class="filter-chip" data-merge="1">🔗 显示相似分组</span>
+              <span style="width:1px;height:24px;background:var(--border);margin:0 4px;"></span>
+              <span style="font-weight:500;color:var(--text-secondary);font-size:13px;margin-right:4px;">排序:</span>
+              <span class="filter-chip active" data-sort="time">⏰ 最近访问</span>
+              <span class="filter-chip" data-sort="copy">📊 复制次数</span>
+              <span class="filter-chip" data-sort="create">📅 创建时间</span>
+            </div>
+          </div>
+
+          <div id="tagFilters" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;"></div>
+        </div>
+
+        <div id="searchResults"></div>
+
+        <div id="similarGroups" style="display:none;">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">🔗 相似内容分组 <span style="font-weight:400;font-size:13px;color:var(--text-muted);margin-left:8px;">（自动识别重复或相似内容）</span></div>
+            </div>
+            <div id="similarGroupList"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/search.js"></script>
+</body>
+</html>

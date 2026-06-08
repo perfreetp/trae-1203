@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>收藏夹 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+      <div class="sidebar-footer">
+        <button class="footer-btn" id="exportFavBtn">📤 导出收藏</button>
+        <button class="footer-btn" id="backHome">🏠 首页</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">⭐ 收藏夹</h1>
+        <p class="page-subtitle">管理你收藏的重要片段，支持置顶和分类</p>
+      </div>
+
+      <div class="content-area">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">置顶内容</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span class="tag" id="pinnedCount">0 条置顶</span>
+            </div>
+          </div>
+          <div id="pinnedSection"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">收藏内容</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div class="layout-toggle">
+                <button class="layout-btn active" data-layout="grid">▦ 网格</button>
+                <button class="layout-btn" data-layout="list">≡ 列表</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="selectModeBtn">☑️ 批量管理</button>
+              <button class="btn btn-primary btn-sm" id="exportAllFavBtn">📤 导出精选集</button>
+            </div>
+          </div>
+
+          <div class="filters-bar">
+            <span class="filter-chip active" data-filter-tag="all">全部标签</span>
+          </div>
+
+          <div id="bulkActions" class="bulk-actions" style="display:none;">
+            <span class="bulk-actions-count">已选择 <span id="selectedCount">0</span> 项</span>
+            <div class="bulk-actions-spacer"></div>
+            <button class="btn btn-secondary btn-sm" id="bulkUnfavBtn">💔 取消收藏</button>
+            <button class="btn btn-secondary btn-sm" id="bulkPinBtn">📌 批量置顶</button>
+            <button class="btn btn-secondary btn-sm" id="bulkTagBtn">🏷️ 加标签</button>
+            <button class="btn btn-secondary btn-sm" id="bulkExportBtn">📤 导出</button>
+            <button class="btn btn-ghost btn-sm" id="cancelSelectBtn">取消</button>
+          </div>
+
+          <div id="favoritesContent"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/favorites.js"></script>
+</body>
+</html>

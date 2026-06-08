@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>详情 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header" style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-secondary btn-sm" onclick="history.back()">← 返回</button>
+        <div>
+          <h1 class="page-title" id="pageTitle">详情</h1>
+          <p class="page-subtitle" id="pageSubtitle">查看和编辑片段详情</p>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <div class="card" id="detailCard">
+          <div class="card-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="detailTypeBadge" class="clip-type-badge type-text">📝 文本</span>
+              <h2 id="detailTitle" style="font-size:17px;font-weight:600;"></h2>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn btn-secondary btn-sm" id="editBtn">✏️ 编辑</button>
+              <button class="btn btn-secondary btn-sm" id="favBtn">⭐ 收藏</button>
+              <button class="btn btn-secondary btn-sm" id="pinBtn">📌 置顶</button>
+              <button class="btn btn-primary btn-sm" id="copyBtn">📋 复制</button>
+            </div>
+          </div>
+
+          <div id="detailContent" class="detail-content"></div>
+
+          <div class="card" style="margin-top:16px;padding:14px 18px;border:1px dashed var(--border);">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;font-size:13px;">
+              <div>
+                <div style="color:var(--text-muted);margin-bottom:3px;">创建时间</div>
+                <div id="createdTime" style="font-weight:500;"></div>
+              </div>
+              <div>
+                <div style="color:var(--text-muted);margin-bottom:3px;">最后修改</div>
+                <div id="modifiedTime" style="font-weight:500;"></div>
+              </div>
+              <div>
+                <div style="color:var(--text-muted);margin-bottom:3px;">最后访问</div>
+                <div id="accessedTime" style="font-weight:500;"></div>
+              </div>
+              <div>
+                <div style="color:var(--text-muted);margin-bottom:3px;">复制次数</div>
+                <div id="copyCount" style="font-weight:500;"></div>
+              </div>
+              <div>
+                <div style="color:var(--text-muted);margin-bottom:3px;">来源</div>
+                <div id="sourceInfo" style="font-weight:500;"></div>
+              </div>
+              <div>
+                <div style="color:var(--text-muted);margin-bottom:3px;">来源网址</div>
+                <div id="sourceUrl" style="font-weight:500;overflow:hidden;text-overflow:ellipsis;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🏷️ 标签管理</div>
+          </div>
+          <div id="tagEditor" class="tag-input-area"></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab-item active" data-tab="versions">📜 历史版本</div>
+          <div class="tab-item" data-tab="quote">💬 引用卡片</div>
+        </div>
+
+        <div class="card" id="versionsPanel">
+          <div class="card-header">
+            <div class="card-title">历史版本 <span style="font-weight:400;font-size:13px;color:var(--text-muted);margin-left:6px;">（保留最近20个版本）</span></div>
+          </div>
+          <div id="versionsList" class="versions-list"></div>
+        </div>
+
+        <div class="card" id="quotePanel" style="display:none;">
+          <div class="card-header">
+            <div class="card-title">生成引用卡片</div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary btn-sm" id="copyQuoteBtn">📋 复制引用</button>
+              <button class="btn btn-primary btn-sm" id="downloadQuoteBtn">💾 下载为文件</button>
+            </div>
+          </div>
+          <div id="quoteOutput" class="quote-card-output"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/detail.js"></script>
+</body>
+</html>

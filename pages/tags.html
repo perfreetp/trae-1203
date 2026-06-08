@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>标签管理 - 剪切板博物馆</title>
+  <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">📋</div>
+        <div class="logo-text">剪切板博物馆</div>
+      </div>
+      <div class="nav-menu"></div>
+      <div class="sidebar-footer">
+        <button class="footer-btn" id="mergeBtn">🔗 合并标签</button>
+        <button class="footer-btn" id="addNewBtn">➕ 新建</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">🏷️ 标签管理</h1>
+        <p class="page-subtitle">创建和管理标签，批量整理你的素材</p>
+      </div>
+
+      <div class="content-area">
+        <div class="stats-grid" id="tagStats"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">所有标签</div>
+            <div style="display:flex;gap:8px;">
+              <input type="text" class="form-input" id="tagSearchInput" placeholder="搜索标签..." style="width:200px;">
+              <button class="btn btn-primary btn-sm" id="createTagBtn">➕ 创建新标签</button>
+            </div>
+          </div>
+          <div id="tagsList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">批量整理</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span style="font-size:13px;color:var(--text-muted);">选择一个标签查看相关片段</span>
+            </div>
+          </div>
+
+          <div id="bulkTagArea">
+            <div id="tagFilterChips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+            <div id="bulkTagClips"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/ui.js"></script>
+  <script src="../js/tags.js"></script>
+</body>
+</html>
