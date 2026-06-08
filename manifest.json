@@ -5,8 +5,7 @@
   "description": "为经常复制资料、代码和图片的用户整理临时素材的浏览器扩展",
   "permissions": [
     "storage",
-    "clipboardRead",
-    "clipboardWrite",
+    "alarms",
     "activeTab",
     "tabs",
     "scripting",

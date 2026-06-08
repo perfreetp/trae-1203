@@ -433,17 +433,38 @@ async function copyToClipboardSW(text) {
 }
 
 chrome.runtime.onInstalled.addListener(async (details) => {
-  if (details.reason === 'install') {
-    const settings = await DB.getSettings();
-    await DB.saveSettings(settings);
+  try {
+    if (details.reason === 'install') {
+      const settings = await DB.getSettings();
+      await DB.saveSettings(settings);
+      await DB.saveTags(await DB.getTags());
+    }
+    await ClipManager.cleanupByKeepDays();
+
+    try {
+      const alarm = await chrome.alarms.get('cleanup-old-clips');
+      if (!alarm) {
+        chrome.alarms.create('cleanup-old-clips', {
+          delayInMinutes: 60,
+          periodInMinutes: 360
+        });
+      }
+    } catch (e) {
+      console.warn('alarms init failed:', e);
+    }
+  } catch (e) {
+    console.error('onInstalled error:', e);
   }
-  await ClipManager.cleanupByKeepDays();
 });
 
-chrome.alarms.create('cleanup-old-clips', { periodInMinutes: 360 });
-chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'cleanup-old-clips') await ClipManager.cleanupByKeepDays();
-});
+try {
+  chrome.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === 'cleanup-old-clips') {
+      try { await ClipManager.cleanupByKeepDays(); }
+      catch (e) { console.error('cleanup alarm error:', e); }
+    }
+  });
+} catch (e) { console.warn('alarms listener failed:', e); }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {

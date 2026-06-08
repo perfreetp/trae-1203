@@ -16,11 +16,11 @@ const state = {
 const els = {};
 
 async function init() {
-  Nav.init('timeline');
+  try { Nav.init('timeline'); } catch (e) { console.warn('Nav init:', e); }
   cacheEls();
-  await loadData();
-  bindEvents();
-  render();
+  try { await loadData(); } catch (e) { console.error('loadData:', e); }
+  try { bindEvents(); } catch (e) { console.error('bindEvents:', e); }
+  try { render(); } catch (e) { console.error('render:', e); document.body.innerHTML += `<div style="padding:20px;color:var(--danger);">页面渲染出错：${e.message}</div>`; }
 }
 
 function cacheEls() {

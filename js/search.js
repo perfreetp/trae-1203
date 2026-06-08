@@ -13,11 +13,11 @@ const state = {
 };
 
 async function init() {
-  Nav.init('search');
-  await loadData();
-  bindEvents();
-  renderTagFilters();
-  doSearch();
+  try { Nav.init('search'); } catch (e) { console.warn('Nav init:', e); }
+  try { await loadData(); } catch (e) { console.error('loadData:', e); }
+  try { bindEvents(); } catch (e) { console.error('bindEvents:', e); }
+  try { renderTagFilters(); } catch (e) { console.error('renderTagFilters:', e); }
+  try { await doSearch(); } catch (e) { console.error('doSearch:', e); }
 }
 
 async function loadData() {

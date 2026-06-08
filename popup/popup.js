@@ -20,10 +20,10 @@ const elements = {
 };
 
 async function init() {
-  await loadSettings();
-  await loadClips();
-  bindEvents();
-  render();
+  try { await loadSettings(); } catch (e) { console.error('loadSettings:', e); }
+  try { await loadClips(); } catch (e) { console.error('loadClips:', e); }
+  try { bindEvents(); } catch (e) { console.error('bindEvents:', e); }
+  try { render(); } catch (e) { console.error('render:', e); }
 }
 
 async function loadSettings() {
@@ -53,6 +53,18 @@ async function loadClips() {
   if (state.currentTab === 'top') {
     const r = await UI.sendMessage('getTopClips', { limit: 20 });
     results = r.success ? r.data : [];
+    if (state.searchQuery && state.searchQuery.trim()) {
+      const q = state.searchQuery.toLowerCase().trim();
+      results = results.filter(clip => {
+        const content = (clip.content || '').toLowerCase();
+        const title = (clip.title || '').toLowerCase();
+        const source = (clip.sourceHost || clip.sourceApp || '').toLowerCase();
+        const tags = (clip.tags || []).join(' ').toLowerCase();
+        const url = (clip.sourceUrl || '').toLowerCase();
+        return content.includes(q) || title.includes(q) || source.includes(q)
+          || tags.includes(q) || url.includes(q);
+      });
+    }
   } else {
     const r = await UI.sendMessage('searchClips', { query: state.searchQuery, filters });
     results = r.success ? r.data : [];

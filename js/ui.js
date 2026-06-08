@@ -201,12 +201,41 @@ const UI = {
     URL.revokeObjectURL(url);
   },
 
-  sendMessage(action, payload = {}) {
-    return new Promise((resolve) => {
-      chrome.runtime.sendMessage({ action, payload }, (response) => {
-        resolve(response || { success: false, error: 'no-response' });
-      });
+  sendMessage(action, payload = {}, { timeout = 10000, retries = 1 } = {}) {
+    const sendOnce = () => new Promise((resolve) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (!done) { done = true; resolve({ success: false, error: 'timeout' }); }
+      }, timeout);
+      try {
+        chrome.runtime.sendMessage({ action, payload }, (response) => {
+          clearTimeout(timer);
+          if (done) return;
+          done = true;
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message || 'runtime-error' });
+            return;
+          }
+          resolve(response || { success: false, error: 'no-response' });
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        if (!done) { done = true; resolve({ success: false, error: e.message || 'exception' }); }
+      }
     });
+
+    return (async () => {
+      let last = null;
+      for (let i = 0; i <= retries; i++) {
+        const r = await sendOnce();
+        if (r && r.success) return r;
+        last = r;
+        if (i < retries) {
+          await new Promise(res => setTimeout(res, 150 + i * 200));
+        }
+      }
+      return last || { success: false, error: 'unknown' };
+    })();
   },
 
   generateQuoteCard(clip) {

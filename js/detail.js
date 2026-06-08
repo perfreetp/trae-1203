@@ -234,13 +234,38 @@ function bindEvents() {
       </div>
     `);
 
+    const finishEdit = async () => {
+      state.isEditing = false;
+    };
+
+    const origClose = close;
+    const wrappedClose = () => {
+      try { finishEdit(); } catch (e) { console.warn(e); }
+      try { origClose(); } catch (e) { console.warn(e); }
+    };
+
+    modal.querySelectorAll('[data-close]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        wrappedClose();
+      });
+    });
+
+    if (modal.parentElement) {
+      modal.parentElement.addEventListener('click', (e) => {
+        if (e.target === modal.parentElement) {
+          wrappedClose();
+        }
+      });
+    }
+
     document.getElementById('saveEdit').addEventListener('click', async () => {
       const newTitle = document.getElementById('editTitle').value.trim();
       const newContent = document.getElementById('editContent').value;
       await UI.sendMessage('updateClip', { id: state.clipId, updates: { title: newTitle, content: newContent } });
       UI.toast('已保存', 'success');
-      close();
-      state.isEditing = false;
+      wrappedClose();
       await loadData();
       render();
     });
