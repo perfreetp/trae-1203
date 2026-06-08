@@ -466,6 +466,37 @@ try {
   });
 } catch (e) { console.warn('alarms listener failed:', e); }
 
+(async function ensureAlarmExists() {
+  try {
+    const alarm = await chrome.alarms.get('cleanup-old-clips');
+    if (!alarm) {
+      chrome.alarms.create('cleanup-old-clips', {
+        delayInMinutes: 60,
+        periodInMinutes: 360
+      });
+    }
+  } catch (e) {
+    console.warn('ensure alarm check failed:', e);
+  }
+})();
+
+try {
+  chrome.runtime.onStartup.addListener(async () => {
+    try {
+      const alarm = await chrome.alarms.get('cleanup-old-clips');
+      if (!alarm) {
+        chrome.alarms.create('cleanup-old-clips', {
+          delayInMinutes: 60,
+          periodInMinutes: 360
+        });
+      }
+      await ClipManager.cleanupByKeepDays();
+    } catch (e) {
+      console.warn('onStartup error:', e);
+    }
+  });
+} catch (e) { console.warn('onStartup listener failed:', e); }
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   (async () => {
     try {
