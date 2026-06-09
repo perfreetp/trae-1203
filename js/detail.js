@@ -35,7 +35,7 @@ async function loadData() {
     UI.sendMessage('getSettings')
   ]);
   if (clipRes.success) state.clip = clipRes.data;
-  if (verRes.success) state.versions = verRes.data.reverse();
+  if (verRes.success) state.versions = Array.isArray(verRes.data) ? verRes.data : [];
   if (tagRes.success) state.allTags = tagRes.data;
   if (setRes.success) state.settings = setRes.data;
 }
@@ -62,20 +62,18 @@ function render() {
 
   const contentEl = document.getElementById('detailContent');
   contentEl.className = 'detail-content';
+  const mask = state.settings?.enableSensitiveMask ? state.settings.sensitiveWords : null;
   if (state.clip.type === 'image' && state.clip.imageData) {
     contentEl.innerHTML = `<img src="${state.clip.imageData}" alt="图片" style="max-width:100%;border-radius:var(--radius-md);">`;
   } else if (state.clip.type === 'code') {
     contentEl.classList.add('code-content');
-    contentEl.textContent = state.clip.content;
+    const codeHtml = mask ? UI.maskSensitive(state.clip.content || '', mask) : UI.escapeHtml(state.clip.content || '');
+    contentEl.innerHTML = codeHtml;
   } else if (state.clip.type === 'link') {
-    contentEl.innerHTML = `<a href="${UI.escapeAttr(state.clip.content)}" target="_blank" style="color:var(--primary);word-break:break-all;">${UI.escapeHtml(state.clip.content)}</a>`;
+    const linkText = mask ? UI.maskSensitive(state.clip.content || '', mask) : UI.escapeHtml(state.clip.content || '');
+    contentEl.innerHTML = `<a href="${UI.escapeAttr(state.clip.content)}" target="_blank" style="color:var(--primary);word-break:break-all;">${linkText}</a>`;
   } else {
-    let text = state.clip.content;
-    if (state.settings?.enableSensitiveMask) {
-      text = UI.maskSensitive(text, state.settings.sensitiveWords);
-    } else {
-      text = UI.escapeHtml(text);
-    }
+    let text = mask ? UI.maskSensitive(state.clip.content || '', mask) : UI.escapeHtml(state.clip.content || '');
     contentEl.innerHTML = text.replace(/\n/g, '<br>');
   }
 
@@ -149,32 +147,31 @@ function renderVersions() {
   }
 
   let diffHtml = '';
-  if (state.diffMode && state.diffVersionIdx >= -1 && state.versions.length > 0) {
+  if (state.diffMode && state.versions.length > 0) {
     let oldContent = '', oldLabel = '', newContent = '', newLabel = '';
-    if (state.diffMode === 'prev') {
-      if (state.diffVersionIdx >= state.versions.length - 1) {
-        oldContent = state.versions[state.versions.length - 1]?.content || '';
-        oldLabel = UI.formatTimestamp(state.versions[state.versions.length - 1]?.timestamp || Date.now());
+    if (state.diffMode === 'prev' && state.diffVersionIdx >= 0) {
+      const cur = state.versions[state.diffVersionIdx];
+      const prevIdx = state.diffVersionIdx - 1;
+      if (prevIdx >= 0) {
+        const prev = state.versions[prevIdx];
+        oldContent = prev.content || '';
+        oldLabel = `前一版本（${UI.formatTimestamp(prev.timestamp)}）`;
+        newContent = cur.content || '';
+        newLabel = `当前选中（${UI.formatTimestamp(cur.timestamp)}）`;
       } else {
-        const idx = state.diffVersionIdx + 1;
-        oldContent = state.versions[idx]?.content || '';
-        oldLabel = UI.formatTimestamp(state.versions[idx]?.timestamp || Date.now());
-      }
-      if (state.diffVersionIdx === -1) {
-        newContent = state.clip.content || '';
+        oldContent = cur.content || '';
+        oldLabel = `最早版本（${UI.formatTimestamp(cur.timestamp)}）`;
+        newContent = state.clip.content;
         newLabel = `当前版本（${UI.formatTimestamp(state.clip.lastModified || state.clip.timestamp)}）`;
-      } else {
-        newContent = state.versions[state.diffVersionIdx]?.content || '';
-        newLabel = UI.formatTimestamp(state.versions[state.diffVersionIdx]?.timestamp || Date.now());
       }
-    } else if (state.diffMode === 'current') {
+    } else if (state.diffMode === 'current' && state.diffVersionIdx >= 0) {
       const target = state.versions[state.diffVersionIdx];
       oldContent = target?.content || '';
-      oldLabel = `历史版本（${UI.formatTimestamp(target?.timestamp || Date.now())}）`;
-      newContent = state.clip.content || '';
+      oldLabel = `历史版本（${UI.formatTimestamp(target?.timestamp)}）`;
+      newContent = state.clip.content;
       newLabel = `当前版本（${UI.formatTimestamp(state.clip.lastModified || state.clip.timestamp)}）`;
     }
-    if (oldContent !== newContent || oldLabel) {
+    if (oldLabel) {
       diffHtml = `
         <div class="card" style="margin:14px 0;border:1px solid var(--primary);">
           <div class="card-header">
@@ -189,6 +186,7 @@ function renderVersions() {
     }
   }
 
+  const displayVersions = state.versions.slice().reverse();
   container.innerHTML = `
     <div style="padding:10px 12px;border:1px solid var(--primary);border-radius:var(--radius-sm);background:var(--primary-light);margin-bottom:10px;">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
@@ -199,20 +197,22 @@ function renderVersions() {
         </div>
       </div>
       <div style="margin-top:6px;font-size:13px;color:var(--text-secondary);word-break:break-word;">${UI.escapeHtml(UI.truncate(state.clip.content || '', 150))}</div>
-      <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">💡 点击历史版本的「对比当前」或「对比前版」查看改动差异</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">💡 点击历史版本的「对比当前」或「对比前版」查看改动差异 · 列表按时间从新到旧排序</div>
     </div>
     ${diffHtml}
-  ` + state.versions.map((v, idx) => `
+  ` + displayVersions.map((v) => {
+    const realIdx = state.versions.indexOf(v);
+    return `
     <div class="version-item">
       <div class="version-time">${UI.formatTimestamp(v.timestamp)}</div>
       <div class="version-preview" style="flex:1;">${UI.escapeHtml(UI.truncate(v.content || '', 120))}</div>
       <div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">
-        <button class="btn btn-sm btn-secondary" data-diff-current="${idx}" title="与当前版本对比">🔍 对比当前</button>
-        <button class="btn btn-sm btn-secondary" data-diff-prev="${idx}" title="与前一版本对比">↔ 对比前版</button>
-        <button class="btn btn-sm btn-primary" data-restore="${idx}">还原</button>
+        <button class="btn btn-sm btn-secondary" data-diff-current="${realIdx}" title="与当前版本对比">🔍 对比当前</button>
+        <button class="btn btn-sm btn-secondary" data-diff-prev="${realIdx}" title="与前一版本对比">↔ 对比前版</button>
+        <button class="btn btn-sm btn-primary" data-restore="${realIdx}">还原</button>
       </div>
     </div>
-  `).join('');
+  `}).join('');
 
   const closeDiff = container.querySelector('#closeDiffBtn');
   if (closeDiff) closeDiff.addEventListener('click', () => {

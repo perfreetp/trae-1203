@@ -167,17 +167,17 @@ function renderClipCard(clip) {
   if (clip.type === 'image' && clip.imageData) {
     contentHtml = `<div class="clip-content image-content"><img src="${clip.imageData}" alt="图片"></div>`;
   } else if (clip.type === 'code') {
-    const base = UI.escapeHtml(UI.truncate(clip.content, 300));
-    const withMask = sensitiveWords ? UI.maskSensitive(clip.content, sensitiveWords) : null;
-    const finalHtml = withMask ? UI.truncate(withMask, 300) : base;
-    contentHtml = `<div class="clip-content code-content">${UI.highlightMatches(finalHtml, state.searchQuery)}</div>`;
+    const truncated = UI.truncate(clip.content || '', 600);
+    const masked = sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated);
+    contentHtml = `<div class="clip-content code-content">${UI.highlightMatches(masked, state.searchQuery)}</div>`;
   } else if (clip.type === 'link') {
-    contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${UI.highlightMatches(UI.truncate(UI.escapeHtml(clip.content), 200), state.searchQuery)}</a></div>`;
+    const truncated = UI.truncate(clip.content || '', 500);
+    const masked = sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated);
+    contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${UI.highlightMatches(masked, state.searchQuery)}</a></div>`;
   } else {
-    const text = sensitiveWords
-      ? UI.maskSensitive(clip.content, sensitiveWords)
-      : UI.escapeHtml(clip.content);
-    contentHtml = `<div class="clip-content">${UI.highlightMatches(UI.truncate(text, 250), state.searchQuery)}</div>`;
+    const truncated = UI.truncate(clip.content || '', 500);
+    const masked = sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated);
+    contentHtml = `<div class="clip-content">${UI.highlightMatches(masked, state.searchQuery)}</div>`;
   }
 
   const tagsHtml = clip.tags && clip.tags.length > 0

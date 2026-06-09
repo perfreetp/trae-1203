@@ -42,14 +42,15 @@ function renderClipCard(clip) {
   if (clip.type === 'image' && clip.imageData) {
     contentHtml = `<div class="clip-content image-content"><img src="${clip.imageData}" alt="图片"></div>`;
   } else if (clip.type === 'code') {
-    contentHtml = `<div class="clip-content code-content">${sensitiveWords ? UI.maskSensitive(clip.content, sensitiveWords) : UI.escapeHtml(UI.truncate(clip.content, 300))}</div>`;
+    const truncated = UI.truncate(clip.content || '', 600);
+    contentHtml = `<div class="clip-content code-content">${sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated)}</div>`;
   } else if (clip.type === 'link') {
-    contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${UI.escapeHtml(UI.truncate(clip.content, 200))}</a></div>`;
+    const truncated = UI.truncate(clip.content || '', 500);
+    const masked = sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated);
+    contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${masked}</a></div>`;
   } else {
-    const text = sensitiveWords
-      ? UI.maskSensitive(clip.content, sensitiveWords)
-      : UI.escapeHtml(UI.truncate(clip.content, 250));
-    contentHtml = `<div class="clip-content">${text}</div>`;
+    const truncated = UI.truncate(clip.content || '', 500);
+    contentHtml = `<div class="clip-content">${sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated)}</div>`;
   }
 
   const tagsHtml = clip.tags && clip.tags.length > 0

@@ -316,19 +316,26 @@ const UI = {
     if (!text || !sensitiveWords || sensitiveWords.length === 0) return UI.escapeHtml(text);
     let result = UI.escapeHtml(text);
     for (const word of sensitiveWords) {
-      const escaped = UI.escapeHtml(word);
-      const regex = new RegExp('(' + escaped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*[:=]\\s*[^\\s<]+)', 'gi');
-      result = result.replace(regex, '<span class="sensitive-mask" title="敏感内容已遮罩，点击/悬停查看">$1</span>');
+      if (!word) continue;
+      const escapedWord = UI.escapeHtml(word);
+      const safeWord = escapedWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const pattern = '(' + safeWord + ')(\\s*[:=]\\s*)([^\\s&;"\'<>]{2,})';
+      const regex = new RegExp(pattern, 'gi');
+      result = result.replace(regex, (_, kw, sep, val) => {
+        const maskedVal = '*'.repeat(Math.max(6, Math.min(12, val.length)));
+        return '<span class="sensitive-mask" title="敏感内容已遮罩">' + kw + sep + maskedVal + '</span>';
+      });
     }
     return result;
   },
 
-  highlightMatches(text, query) {
-    const escaped = UI.escapeHtml(text);
-    if (!query) return escaped;
-    const regex = new RegExp('(' + query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
-    return escaped.replace(regex, '<mark style="background: #fef08a; padding: 0 2px; border-radius: 2px;">$1</mark>');
-  }
+  highlightMatches(htmlContent, searchQuery) {
+    if (!searchQuery) return htmlContent || '';
+    const text = htmlContent || '';
+    const safeQuery = String(searchQuery).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const qRegex = new RegExp('(' + safeQuery + ')(?![^<]*>)', 'gi');
+    return text.replace(qRegex, '<mark style="background:#fef08a;padding:0 2px;border-radius:2px;">$1</mark>');
+  },
 };
 
 const Nav = {

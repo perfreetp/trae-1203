@@ -142,18 +142,19 @@ function renderClip(clip, idx) {
   const typeIcon = UI.getTypeIcon(clip.type);
 
   let contentPreview = '';
+  const sensitiveWords = state.settings?.enableSensitiveMask ? state.settings.sensitiveWords : null;
   if (clip.type === 'image') {
     contentPreview = `<div class="popup-clip-content image-preview">${typeIcon} 图片 (${clip.imageData ? '已保存' : '无数据'})</div>`;
   } else if (clip.type === 'code') {
-    contentPreview = `<div class="popup-clip-content">${UI.escapeHtml(UI.truncate(clip.content, 120))}</div>`;
+    const truncated = UI.truncate(clip.content || '', 120);
+    contentPreview = `<div class="popup-clip-content">${sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated)}</div>`;
   } else if (clip.type === 'link') {
-    contentPreview = `<div class="popup-clip-content" style="color: var(--primary);">${UI.escapeHtml(UI.truncate(clip.content, 120))}</div>`;
+    const truncated = UI.truncate(clip.content || '', 120);
+    const masked = sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated);
+    contentPreview = `<div class="popup-clip-content" style="color: var(--primary);">${masked}</div>`;
   } else {
-    let text = clip.content;
-    if (state.settings?.enableSensitiveMask) {
-      text = UI.maskSensitive(text, state.settings.sensitiveWords);
-    }
-    contentPreview = `<div class="popup-clip-content">${state.settings?.enableSensitiveMask ? UI.truncate(UI.maskSensitive(clip.content, state.settings.sensitiveWords), 120) : UI.escapeHtml(UI.truncate(clip.content, 120))}</div>`;
+    const truncated = UI.truncate(clip.content || '', 120);
+    contentPreview = `<div class="popup-clip-content">${sensitiveWords ? UI.maskSensitive(truncated, sensitiveWords) : UI.escapeHtml(truncated)}</div>`;
   }
 
   const tagsHtml = clip.tags && clip.tags.length > 0
