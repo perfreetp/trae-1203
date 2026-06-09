@@ -1,13 +1,18 @@
+const FILTERS_KEY = 'clip_museum_search_filters';
 const state = {
   clips: [],
   allTags: [],
+  settings: null,
   searchQuery: '',
   filters: {
     type: 'all',
     fav: false,
     pin: false,
     merge: false,
-    tags: []
+    tags: [],
+    dateRange: 'all',
+    sources: [],
+    contentKinds: []
   },
   sort: 'time'
 };
@@ -21,12 +26,23 @@ async function init() {
 }
 
 async function loadData() {
-  const [tRes, cRes] = await Promise.all([
+  let saved = null;
+  try { saved = await chrome.storage.local.get(FILTERS_KEY); } catch (e) {}
+  if (saved && saved[FILTERS_KEY] && typeof saved[FILTERS_KEY] === 'object') {
+    state.filters = Object.assign(state.filters, saved[FILTERS_KEY]);
+    if (!Array.isArray(state.filters.tags)) state.filters.tags = [];
+    if (!Array.isArray(state.filters.sources)) state.filters.sources = [];
+    if (!Array.isArray(state.filters.contentKinds)) state.filters.contentKinds = [];
+  }
+
+  const [tRes, cRes, sRes] = await Promise.all([
     UI.sendMessage('getTags'),
-    UI.sendMessage('searchClips', { query: '', filters: {} })
+    UI.sendMessage('searchClips', { query: '', filters: {} }),
+    UI.sendMessage('getSettings')
   ]);
   if (tRes.success) state.allTags = tRes.data;
   if (cRes.success) state.clips = cRes.data;
+  if (sRes.success) state.settings = sRes.data;
 
   const urlParam = Nav.getParam('q');
   if (urlParam) {
@@ -49,14 +65,51 @@ function renderTagFilters() {
     }).join('');
 
   container.querySelectorAll('[data-filter-tag]').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', async () => {
       const tag = chip.dataset.filterTag;
       const idx = state.filters.tags.indexOf(tag);
       if (idx >= 0) state.filters.tags.splice(idx, 1);
       else state.filters.tags.push(tag);
       chip.classList.toggle('active');
+      await persistFilters();
       doSearch();
     });
+  });
+}
+
+async function persistFilters() {
+  try { await chrome.storage.local.set({ [FILTERS_KEY]: state.filters }); }
+  catch (e) { console.warn('persist filters failed:', e); }
+}
+
+function applyLocalFilters(clips) {
+  const now = Date.now();
+  const ranges = {
+    '1h': 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+    '90d': 90 * 24 * 60 * 60 * 1000
+  };
+  return clips.filter(c => {
+    if (state.filters.dateRange !== 'all' && ranges[state.filters.dateRange]) {
+      if (now - (c.timestamp || 0) > ranges[state.filters.dateRange]) return false;
+    }
+    if (state.filters.sources && state.filters.sources.length > 0) {
+      const s = (c.sourceHost || c.sourceApp || '');
+      if (!state.filters.sources.includes(s)) return false;
+    }
+    if (state.filters.contentKinds && state.filters.contentKinds.length > 0) {
+      const kinds = [];
+      if (c.type === 'image') kinds.push('hasImage');
+      if (c.type === 'code') kinds.push('hasCode');
+      if (c.tags && c.tags.length > 0) kinds.push('hasTags');
+      if (c.isFavorite) kinds.push('hasFav');
+      let hasAny = false;
+      for (const k of state.filters.contentKinds) if (kinds.includes(k)) { hasAny = true; break; }
+      if (!hasAny) return false;
+    }
+    return true;
   });
 }
 
@@ -69,6 +122,7 @@ async function doSearch() {
 
   const r = await UI.sendMessage('searchClips', { query: state.searchQuery, filters: searchFilters });
   let results = r.success ? r.data : [];
+  results = applyLocalFilters(results);
 
   if (state.sort === 'copy') {
     results.sort((a, b) => (b.copyCount || 0) - (a.copyCount || 0));
@@ -83,9 +137,11 @@ async function doSearch() {
 
 function renderResults(results) {
   const container = document.getElementById('searchResults');
+  const settingsOk = state.settings ? '✅ 隐私设置已读取' : '⚠️ 正在读取隐私设置';
+  const maskStatus = state.settings?.enableSensitiveMask ? '（敏感词遮罩：开启）' : '（敏感词遮罩：关闭）';
 
   if (results.length === 0) {
-    container.innerHTML = `<div class="card" style="text-align:center;padding:60px 20px;margin-top:20px;"><div class="empty-icon">🔍</div><div class="empty-title">没有找到匹配的内容</div><div class="empty-desc">试试其他关键词，或者调整筛选条件</div></div>`;
+    container.innerHTML = `<div class="card" style="text-align:center;padding:60px 20px;margin-top:20px;"><div class="empty-icon">🔍</div><div class="empty-title">没有找到匹配的内容</div><div class="empty-desc">试试其他关键词，或者调整筛选条件<br><span style="font-size:12px;color:var(--text-muted);margin-top:8px;display:block;">${settingsOk} ${maskStatus}</span></div></div>`;
     return;
   }
 
@@ -93,6 +149,7 @@ function renderResults(results) {
     <div class="card" style="margin-top:20px;">
       <div class="card-header">
         <div class="card-title">搜索结果 <span style="font-weight:400;font-size:13px;color:var(--text-muted);margin-left:6px;">共 ${results.length} 条</span></div>
+        <span style="font-size:12px;color:var(--text-muted);">${settingsOk}</span>
       </div>
       <div class="grid-layout">
         ${results.map(clip => renderClipCard(clip)).join('')}
@@ -105,14 +162,22 @@ function renderResults(results) {
 
 function renderClipCard(clip) {
   let contentHtml = '';
+  const sensitiveWords = state.settings?.enableSensitiveMask ? state.settings.sensitiveWords : null;
+
   if (clip.type === 'image' && clip.imageData) {
     contentHtml = `<div class="clip-content image-content"><img src="${clip.imageData}" alt="图片"></div>`;
   } else if (clip.type === 'code') {
-    contentHtml = `<div class="clip-content code-content">${UI.highlightMatches(UI.truncate(clip.content, 300), state.searchQuery)}</div>`;
+    const base = UI.escapeHtml(UI.truncate(clip.content, 300));
+    const withMask = sensitiveWords ? UI.maskSensitive(clip.content, sensitiveWords) : null;
+    const finalHtml = withMask ? UI.truncate(withMask, 300) : base;
+    contentHtml = `<div class="clip-content code-content">${UI.highlightMatches(finalHtml, state.searchQuery)}</div>`;
   } else if (clip.type === 'link') {
-    contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${UI.highlightMatches(UI.truncate(clip.content, 200), state.searchQuery)}</a></div>`;
+    contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${UI.highlightMatches(UI.truncate(UI.escapeHtml(clip.content), 200), state.searchQuery)}</a></div>`;
   } else {
-    contentHtml = `<div class="clip-content">${UI.highlightMatches(UI.truncate(clip.content, 250), state.searchQuery)}</div>`;
+    const text = sensitiveWords
+      ? UI.maskSensitive(clip.content, sensitiveWords)
+      : UI.escapeHtml(clip.content);
+    contentHtml = `<div class="clip-content">${UI.highlightMatches(UI.truncate(text, 250), state.searchQuery)}</div>`;
   }
 
   const tagsHtml = clip.tags && clip.tags.length > 0
@@ -130,7 +195,7 @@ function renderClipCard(clip) {
           <button class="icon-btn" data-action="detail">ℹ️</button>
         </div>
       </div>
-      <h3 style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:8px;word-break:break-word;">${UI.highlightMatches(clip.title || '', state.searchQuery)}</h3>
+      <h3 style="font-size:14px;font-weight:600;color:var(--text-primary);margin-bottom:8px;word-break:break-word;">${UI.highlightMatches(UI.escapeHtml(clip.title || ''), state.searchQuery)}</h3>
       ${contentHtml}
       ${tagsHtml}
       <div class="clip-footer">
@@ -252,6 +317,110 @@ function renderSimilarGroups(clips) {
   });
 }
 
+async function init() {
+  try { Nav.init('search'); } catch (e) { console.warn('Nav init:', e); }
+  try { await loadData(); } catch (e) { console.error('loadData:', e); }
+  try { bindEvents(); } catch (e) { console.error('bindEvents:', e); }
+  try { restoreFilterUI(); } catch (e) { console.error('restoreFilterUI:', e); }
+  try { renderTagFilters(); } catch (e) { console.error('renderTagFilters:', e); }
+  try { renderExtraFilters(); } catch (e) { console.error('renderExtraFilters:', e); }
+  try { await doSearch(); } catch (e) { console.error('doSearch:', e); }
+}
+
+function restoreFilterUI() {
+  document.querySelectorAll('[data-type]').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.type === state.filters.type);
+  });
+  const favChip = document.querySelector('[data-fav="1"]');
+  if (favChip) favChip.classList.toggle('active', state.filters.fav);
+  const pinChip = document.querySelector('[data-pin="1"]');
+  if (pinChip) pinChip.classList.toggle('active', state.filters.pin);
+  const mergeChip = document.querySelector('[data-merge="1"]');
+  if (mergeChip) mergeChip.classList.toggle('active', state.filters.merge);
+  document.querySelectorAll('[data-sort]').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.sort === state.sort);
+  });
+}
+
+function renderExtraFilters() {
+  const dateContainer = document.getElementById('dateRangeFilters');
+  if (dateContainer) {
+    const ranges = [
+      { key: 'all', label: '全部时间' },
+      { key: '1h', label: '1小时内' },
+      { key: '24h', label: '24小时内' },
+      { key: '7d', label: '7天内' },
+      { key: '30d', label: '30天内' },
+      { key: '90d', label: '90天内' }
+    ];
+    dateContainer.innerHTML = `<span style="font-weight:500;color:var(--text-secondary);font-size:13px;align-self:center;margin-right:4px;">时间:</span>` +
+      ranges.map(r => `<span class="filter-chip ${state.filters.dateRange === r.key ? 'active' : ''}" data-date-range="${r.key}">${r.label}</span>`).join('');
+    dateContainer.querySelectorAll('[data-date-range]').forEach(chip => {
+      chip.addEventListener('click', async () => {
+        dateContainer.querySelectorAll('[data-date-range]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.filters.dateRange = chip.dataset.dateRange;
+        await persistFilters();
+        doSearch();
+      });
+    });
+  }
+
+  const sourcesContainer = document.getElementById('sourceFilters');
+  if (sourcesContainer) {
+    const sourcesMap = {};
+    for (const c of state.clips) {
+      const s = c.sourceHost || c.sourceApp;
+      if (s) sourcesMap[s] = (sourcesMap[s] || 0) + 1;
+    }
+    const sources = Object.entries(sourcesMap).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (sources.length === 0) {
+      sourcesContainer.style.display = 'none';
+    } else {
+      sourcesContainer.style.display = 'flex';
+      sourcesContainer.innerHTML = `<span style="font-weight:500;color:var(--text-secondary);font-size:13px;align-self:center;margin-right:4px;">来源:</span>` +
+        sources.map(([name, count]) => {
+          const active = state.filters.sources.includes(name);
+          return `<span class="filter-chip ${active ? 'active' : ''}" data-source-filter="${UI.escapeAttr(name)}">${UI.escapeHtml(name)} (${count})</span>`;
+        }).join('');
+      sourcesContainer.querySelectorAll('[data-source-filter]').forEach(chip => {
+        chip.addEventListener('click', async () => {
+          const s = chip.dataset.sourceFilter;
+          const i = state.filters.sources.indexOf(s);
+          if (i >= 0) state.filters.sources.splice(i, 1);
+          else state.filters.sources.push(s);
+          chip.classList.toggle('active');
+          await persistFilters();
+          doSearch();
+        });
+      });
+    }
+  }
+
+  const kindsContainer = document.getElementById('kindFilters');
+  if (kindsContainer) {
+    const kinds = [
+      { key: 'hasImage', label: '🖼️ 含图片' },
+      { key: 'hasCode', label: '💻 含代码' },
+      { key: 'hasTags', label: '🏷️ 带标签' },
+      { key: 'hasFav', label: '⭐ 已收藏' }
+    ];
+    kindsContainer.innerHTML = `<span style="font-weight:500;color:var(--text-secondary);font-size:13px;align-self:center;margin-right:4px;">内容:</span>` +
+      kinds.map(k => `<span class="filter-chip ${state.filters.contentKinds.includes(k.key) ? 'active' : ''}" data-content-kind="${k.key}">${k.label}</span>`).join('');
+    kindsContainer.querySelectorAll('[data-content-kind]').forEach(chip => {
+      chip.addEventListener('click', async () => {
+        const k = chip.dataset.contentKind;
+        const i = state.filters.contentKinds.indexOf(k);
+        if (i >= 0) state.filters.contentKinds.splice(i, 1);
+        else state.filters.contentKinds.push(k);
+        chip.classList.toggle('active');
+        await persistFilters();
+        doSearch();
+      });
+    });
+  }
+}
+
 function bindEvents() {
   document.getElementById('searchInput').addEventListener('input', UI.debounce((e) => {
     state.searchQuery = e.target.value;
@@ -259,57 +428,63 @@ function bindEvents() {
   }, 250));
 
   document.querySelectorAll('[data-type]').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', async () => {
       document.querySelectorAll('[data-type]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       state.filters.type = chip.dataset.type;
+      await persistFilters();
       doSearch();
     });
   });
 
-  document.querySelector('[data-fav="1"]').addEventListener('click', (e) => {
+  document.querySelector('[data-fav="1"]').addEventListener('click', async (e) => {
     e.currentTarget.classList.toggle('active');
     state.filters.fav = e.currentTarget.classList.contains('active');
+    await persistFilters();
     doSearch();
   });
 
-  document.querySelector('[data-pin="1"]').addEventListener('click', (e) => {
+  document.querySelector('[data-pin="1"]').addEventListener('click', async (e) => {
     e.currentTarget.classList.toggle('active');
     state.filters.pin = e.currentTarget.classList.contains('active');
+    await persistFilters();
     doSearch();
   });
 
-  document.querySelector('[data-merge="1"]').addEventListener('click', (e) => {
+  document.querySelector('[data-merge="1"]').addEventListener('click', async (e) => {
     e.currentTarget.classList.toggle('active');
     state.filters.merge = e.currentTarget.classList.contains('active');
+    await persistFilters();
     doSearch();
   });
 
   document.querySelectorAll('[data-sort]').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', async () => {
       document.querySelectorAll('[data-sort]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       state.sort = chip.dataset.sort;
+      await persistFilters();
       doSearch();
     });
   });
 
-  document.getElementById('resetFilters').addEventListener('click', () => {
+  document.getElementById('resetFilters').addEventListener('click', async () => {
     state.searchQuery = '';
-    state.filters = { type: 'all', fav: false, pin: false, merge: false, tags: [] };
+    state.filters = { type: 'all', fav: false, pin: false, merge: false, tags: [], dateRange: 'all', sources: [], contentKinds: [] };
     state.sort = 'time';
     document.getElementById('searchInput').value = '';
-    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-    document.querySelector('[data-type="all"]').classList.add('active');
-    document.querySelector('[data-sort="time"]').classList.add('active');
+    await persistFilters();
+    restoreFilterUI();
+    renderExtraFilters();
     renderTagFilters();
     doSearch();
   });
 
-  document.getElementById('similarBtn').addEventListener('click', () => {
+  document.getElementById('similarBtn').addEventListener('click', async () => {
     const chip = document.querySelector('[data-merge="1"]');
-    chip.classList.add('active');
+    if (chip) chip.classList.add('active');
     state.filters.merge = true;
+    await persistFilters();
     doSearch();
   });
 

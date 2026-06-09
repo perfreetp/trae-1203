@@ -4,7 +4,8 @@ const state = {
   tagCounts: {},
   searchQuery: '',
   currentTag: null,
-  selectedClipIds: new Set()
+  selectedClipIds: new Set(),
+  settings: null
 };
 
 async function init() {
@@ -22,12 +23,14 @@ async function init() {
 
 async function loadData() {
   try {
-    const [tRes, cRes] = await Promise.all([
+    const [tRes, cRes, sRes] = await Promise.all([
       UI.sendMessage('getTags'),
-      UI.sendMessage('searchClips', { query: '', filters: {} })
+      UI.sendMessage('searchClips', { query: '', filters: {} }),
+      UI.sendMessage('getSettings')
     ]);
     if (tRes && tRes.success) state.allTags = Array.isArray(tRes.data) ? tRes.data : [];
     if (cRes && cRes.success) state.clips = Array.isArray(cRes.data) ? cRes.data : [];
+    if (sRes && sRes.success) state.settings = sRes.data;
   } catch (e) {
     console.error('loadData error:', e);
     state.allTags = [];
@@ -76,9 +79,12 @@ function renderTagsList() {
   if (!list) return;
   const query = (state.searchQuery || '').toLowerCase();
   const filteredTags = state.allTags.filter(t => !query || String(t).toLowerCase().includes(query));
+  const settingsInfo = state.settings
+    ? (state.settings.enableSensitiveMask ? '隐私遮罩：开启' : '隐私遮罩：关闭')
+    : '设置读取中';
 
   if (filteredTags.length === 0) {
-    list.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🏷️</div><div class="empty-title">${state.searchQuery ? '没有找到匹配的标签' : '暂无标签'}</div><div class="empty-desc">${state.searchQuery ? '' : '点击右上角「创建新标签」开始组织素材'}</div></div>`;
+    list.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">🏷️</div><div class="empty-title">${state.searchQuery ? '没有找到匹配的标签' : '暂无标签'}</div><div class="empty-desc">${state.searchQuery ? '' : '点击右上角「创建新标签」开始组织素材'}<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">✅ 隐私${settingsInfo}</div></div></div>`;
     return;
   }
 
@@ -224,9 +230,14 @@ function renderBulkTagClips() {
     : state.clips.slice(0, 50);
 
   if (clips.length === 0) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">没有内容</div><div class="empty-desc">${state.currentTag ? '此标签下没有内容' : '先复制一些内容吧'}</div></div>`;
+    const sInfo = state.settings
+      ? (state.settings.enableSensitiveMask ? '隐私遮罩：开启' : '隐私遮罩：关闭')
+      : '设置读取中';
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-title">没有内容</div><div class="empty-desc">${state.currentTag ? '此标签下没有内容' : '先复制一些内容吧'}<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">✅ ${sInfo}</div></div></div>`;
     return;
   }
+
+  const sensitiveWords = state.settings?.enableSensitiveMask ? state.settings.sensitiveWords : null;
 
   const selectAllChecked = clips.length > 0 && clips.every(c => state.selectedClipIds.has(c.id));
   container.innerHTML = `
@@ -234,6 +245,7 @@ function renderBulkTagClips() {
       <input type="checkbox" class="checkbox" id="tagSelectAll" ${selectAllChecked ? 'checked' : ''}>
       <label for="tagSelectAll" style="cursor:pointer;font-size:13px;">全选 (${clips.length} 项)</label>
       <div style="flex:1;"></div>
+      <span style="font-size:12px;color:var(--text-muted);">${state.settings?.enableSensitiveMask ? '🔒 敏感词已遮罩' : '🔓 原文显示'}</span>
       <span style="font-size:13px;color:var(--text-muted);">已选 ${state.selectedClipIds.size} 项</span>
       <button class="btn btn-secondary btn-sm" id="tagAddBtn" ${state.selectedClipIds.size === 0 ? 'disabled' : ''}>➕ 添加标签</button>
       <button class="btn btn-secondary btn-sm" id="tagRemoveBtn" ${!state.currentTag || state.selectedClipIds.size === 0 ? 'disabled' : ''}>➖ 移除当前标签</button>
@@ -242,7 +254,8 @@ function renderBulkTagClips() {
       ${clips.map(clip => {
         const typeIcon = UI.getTypeIcon(clip.type);
         const typeLabel = UI.getTypeLabel(clip.type);
-        const contentText = clip.type === 'image' ? '🖼️ 图片内容' : UI.escapeHtml(UI.truncate(clip.content || '', 100));
+        let contentText = clip.type === 'image' ? '🖼️ 图片内容' : (sensitiveWords ? UI.maskSensitive(clip.content, sensitiveWords) : UI.escapeHtml(UI.truncate(clip.content || '', 100)));
+        if (clip.type === 'code' && !sensitiveWords) contentText = UI.escapeHtml(UI.truncate(clip.content || '', 100));
         const tagsHtml = clip.tags && clip.tags.length > 0
           ? clip.tags.map(t => `<span class="tag">#${UI.escapeHtml(t)}</span>`).join('')
           : '';

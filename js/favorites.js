@@ -3,6 +3,7 @@ const state = {
   pinned: [],
   favorites: [],
   tags: [],
+  settings: null,
   selectedIds: new Set(),
   selectMode: false,
   layout: 'grid',
@@ -17,30 +18,38 @@ async function init() {
 }
 
 async function loadData() {
-  const r = await UI.sendMessage('searchClips', { query: '', filters: {} });
+  const [r, t, s] = await Promise.all([
+    UI.sendMessage('searchClips', { query: '', filters: {} }),
+    UI.sendMessage('getTags'),
+    UI.sendMessage('getSettings')
+  ]);
   if (r.success) {
     state.clips = r.data;
     state.pinned = r.data.filter(c => c.isPinned).sort((a, b) => b.lastAccessed - a.lastAccessed);
     state.favorites = r.data.filter(c => c.isFavorite && !c.isPinned).sort((a, b) => b.lastAccessed - a.lastAccessed);
   }
-  const t = await UI.sendMessage('getTags');
   if (t.success) state.tags = t.data;
+  if (s.success) state.settings = s.data;
 }
 
 function renderClipCard(clip) {
   const selected = state.selectedIds.has(clip.id);
   const pinnedClass = clip.isPinned ? 'pinned' : '';
   const selectedClass = selected ? 'selected' : '';
+  const sensitiveWords = state.settings?.enableSensitiveMask ? state.settings.sensitiveWords : null;
 
   let contentHtml = '';
   if (clip.type === 'image' && clip.imageData) {
     contentHtml = `<div class="clip-content image-content"><img src="${clip.imageData}" alt="图片"></div>`;
   } else if (clip.type === 'code') {
-    contentHtml = `<div class="clip-content code-content">${UI.escapeHtml(UI.truncate(clip.content, 300))}</div>`;
+    contentHtml = `<div class="clip-content code-content">${sensitiveWords ? UI.maskSensitive(clip.content, sensitiveWords) : UI.escapeHtml(UI.truncate(clip.content, 300))}</div>`;
   } else if (clip.type === 'link') {
     contentHtml = `<div class="clip-content link-content"><a href="${UI.escapeAttr(clip.content)}" target="_blank" onclick="event.stopPropagation();">${UI.escapeHtml(UI.truncate(clip.content, 200))}</a></div>`;
   } else {
-    contentHtml = `<div class="clip-content">${UI.escapeHtml(UI.truncate(clip.content, 250))}</div>`;
+    const text = sensitiveWords
+      ? UI.maskSensitive(clip.content, sensitiveWords)
+      : UI.escapeHtml(UI.truncate(clip.content, 250));
+    contentHtml = `<div class="clip-content">${text}</div>`;
   }
 
   const tagsHtml = clip.tags && clip.tags.length > 0

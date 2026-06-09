@@ -93,7 +93,12 @@
         <div class="card" id="quotePanel" style="display:none;">
           <div class="card-header">
             <div class="card-title">生成引用卡片</div>
-            <div style="display:flex;gap:8px;">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <div style="display:flex;gap:4px;align-items:center;margin-right:4px;">
+                <span class="filter-chip active" data-quote-mode="full">📝 完整版（含标签标题）</span>
+                <span class="filter-chip" data-quote-mode="source">🔗 带来源版</span>
+                <span class="filter-chip" data-quote-mode="simple">✨ 简洁版</span>
+              </div>
               <button class="btn btn-secondary btn-sm" id="copyQuoteBtn">📋 复制引用</button>
               <button class="btn btn-primary btn-sm" id="downloadQuoteBtn">💾 下载为文件</button>
             </div>

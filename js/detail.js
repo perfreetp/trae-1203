@@ -5,7 +5,10 @@ const state = {
   allTags: [],
   settings: null,
   isEditing: false,
-  newTags: new Set()
+  newTags: new Set(),
+  quoteMode: 'full',
+  diffMode: null,
+  diffVersionIdx: -1
 };
 
 async function init() {
@@ -145,23 +148,84 @@ function renderVersions() {
     return;
   }
 
+  let diffHtml = '';
+  if (state.diffMode && state.diffVersionIdx >= -1 && state.versions.length > 0) {
+    let oldContent = '', oldLabel = '', newContent = '', newLabel = '';
+    if (state.diffMode === 'prev') {
+      if (state.diffVersionIdx >= state.versions.length - 1) {
+        oldContent = state.versions[state.versions.length - 1]?.content || '';
+        oldLabel = UI.formatTimestamp(state.versions[state.versions.length - 1]?.timestamp || Date.now());
+      } else {
+        const idx = state.diffVersionIdx + 1;
+        oldContent = state.versions[idx]?.content || '';
+        oldLabel = UI.formatTimestamp(state.versions[idx]?.timestamp || Date.now());
+      }
+      if (state.diffVersionIdx === -1) {
+        newContent = state.clip.content || '';
+        newLabel = `当前版本（${UI.formatTimestamp(state.clip.lastModified || state.clip.timestamp)}）`;
+      } else {
+        newContent = state.versions[state.diffVersionIdx]?.content || '';
+        newLabel = UI.formatTimestamp(state.versions[state.diffVersionIdx]?.timestamp || Date.now());
+      }
+    } else if (state.diffMode === 'current') {
+      const target = state.versions[state.diffVersionIdx];
+      oldContent = target?.content || '';
+      oldLabel = `历史版本（${UI.formatTimestamp(target?.timestamp || Date.now())}）`;
+      newContent = state.clip.content || '';
+      newLabel = `当前版本（${UI.formatTimestamp(state.clip.lastModified || state.clip.timestamp)}）`;
+    }
+    if (oldContent !== newContent || oldLabel) {
+      diffHtml = `
+        <div class="card" style="margin:14px 0;border:1px solid var(--primary);">
+          <div class="card-header">
+            <div class="card-title" style="font-size:13px;">📊 版本差异 <span style="font-weight:400;">${oldLabel} → ${newLabel}</span></div>
+            <button class="btn btn-ghost btn-sm" id="closeDiffBtn">关闭对比</button>
+          </div>
+          <div style="padding:10px 12px;max-height:360px;overflow:auto;">
+            ${oldContent === newContent ? '<div style="text-align:center;padding:20px;color:var(--text-muted);">两个版本内容完全相同</div>' : UI.diffText(oldContent, newContent)}
+          </div>
+        </div>
+      `;
+    }
+  }
+
   container.innerHTML = `
     <div style="padding:10px 12px;border:1px solid var(--primary);border-radius:var(--radius-sm);background:var(--primary-light);margin-bottom:10px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <div><strong>当前版本</strong> · ${UI.formatTimestamp(state.clip.lastModified || state.clip.timestamp)}</div>
-        <span style="font-size:12px;color:var(--primary);">共 ${state.versions.length + 1} 个版本</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span style="font-size:12px;color:var(--primary);">共 ${state.versions.length + 1} 个版本</span>
+          <button class="btn btn-sm btn-secondary" id="clearDiffBtn" style="${state.diffMode ? '' : 'display:none;'}">❌ 退出对比</button>
+        </div>
       </div>
-      <div style="margin-top:6px;font-size:13px;color:var(--text-secondary);">${UI.escapeHtml(UI.truncate(state.clip.content, 150))}</div>
+      <div style="margin-top:6px;font-size:13px;color:var(--text-secondary);word-break:break-word;">${UI.escapeHtml(UI.truncate(state.clip.content || '', 150))}</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">💡 点击历史版本的「对比当前」或「对比前版」查看改动差异</div>
     </div>
+    ${diffHtml}
   ` + state.versions.map((v, idx) => `
     <div class="version-item">
       <div class="version-time">${UI.formatTimestamp(v.timestamp)}</div>
-      <div class="version-preview">${UI.escapeHtml(UI.truncate(v.content, 120))}</div>
-      <div style="flex-shrink:0;">
-        <button class="btn btn-sm btn-secondary" data-restore="${idx}">还原</button>
+      <div class="version-preview" style="flex:1;">${UI.escapeHtml(UI.truncate(v.content || '', 120))}</div>
+      <div style="flex-shrink:0;display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-sm btn-secondary" data-diff-current="${idx}" title="与当前版本对比">🔍 对比当前</button>
+        <button class="btn btn-sm btn-secondary" data-diff-prev="${idx}" title="与前一版本对比">↔ 对比前版</button>
+        <button class="btn btn-sm btn-primary" data-restore="${idx}">还原</button>
       </div>
     </div>
   `).join('');
+
+  const closeDiff = container.querySelector('#closeDiffBtn');
+  if (closeDiff) closeDiff.addEventListener('click', () => {
+    state.diffMode = null;
+    state.diffVersionIdx = -1;
+    renderVersions();
+  });
+  const clearDiff = container.querySelector('#clearDiffBtn');
+  if (clearDiff) clearDiff.addEventListener('click', () => {
+    state.diffMode = null;
+    state.diffVersionIdx = -1;
+    renderVersions();
+  });
 
   container.querySelectorAll('[data-restore]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -170,16 +234,37 @@ function renderVersions() {
       const r = await UI.sendMessage('restoreVersion', { id: state.clipId, index: idx });
       if (r.success) {
         UI.toast('已还原', 'success');
+        state.diffMode = null;
+        state.diffVersionIdx = -1;
         await loadData();
         render();
       }
     });
   });
+
+  container.querySelectorAll('[data-diff-current]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.diffMode = 'current';
+      state.diffVersionIdx = parseInt(btn.dataset.diffCurrent);
+      renderVersions();
+    });
+  });
+
+  container.querySelectorAll('[data-diff-prev]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.diffMode = 'prev';
+      state.diffVersionIdx = parseInt(btn.dataset.diffPrev);
+      renderVersions();
+    });
+  });
 }
 
 function renderQuote() {
-  const quote = UI.generateQuoteCard(state.clip);
+  const quote = UI.generateQuoteCard(state.clip, state.quoteMode);
   document.getElementById('quoteOutput').textContent = quote;
+  document.querySelectorAll('[data-quote-mode]').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.quoteMode === state.quoteMode);
+  });
 }
 
 function bindEvents() {
@@ -281,14 +366,21 @@ function bindEvents() {
     });
   });
 
+  document.querySelectorAll('[data-quote-mode]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.quoteMode = chip.dataset.quoteMode;
+      renderQuote();
+    });
+  });
+
   document.getElementById('copyQuoteBtn').addEventListener('click', async () => {
-    const quote = UI.generateQuoteCard(state.clip);
+    const quote = UI.generateQuoteCard(state.clip, state.quoteMode);
     await UI.copyToClipboard(quote);
     UI.toast('引用卡片已复制', 'success', 1500);
   });
 
   document.getElementById('downloadQuoteBtn').addEventListener('click', () => {
-    const quote = UI.generateQuoteCard(state.clip);
+    const quote = UI.generateQuoteCard(state.clip, state.quoteMode);
     const safeTitle = (state.clip.title || '引用卡片').replace(/[\\/:*?"<>|]/g, '_');
     UI.downloadFile(`${safeTitle}_引用.md`, quote, 'text/markdown');
   });

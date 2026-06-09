@@ -1,3 +1,4 @@
+const FILTERS_KEY = 'clip_museum_timeline_filters';
 const state = {
   clips: [],
   settings: null,
@@ -9,7 +10,9 @@ const state = {
     type: 'all',
     favOnly: false,
     pinOnly: false,
-    source: null
+    sources: [],
+    dateRange: 'all',
+    contentKinds: []
   }
 };
 
@@ -20,6 +23,8 @@ async function init() {
   cacheEls();
   try { await loadData(); } catch (e) { console.error('loadData:', e); }
   try { bindEvents(); } catch (e) { console.error('bindEvents:', e); }
+  try { restoreFilterUI(); } catch (e) { console.error('restoreFilterUI:', e); }
+  try { renderExtraFilters(); } catch (e) { console.error('renderExtraFilters:', e); }
   try { render(); } catch (e) { console.error('render:', e); document.body.innerHTML += `<div style="padding:20px;color:var(--danger);">页面渲染出错：${e.message}</div>`; }
 }
 
@@ -35,6 +40,14 @@ function cacheEls() {
 }
 
 async function loadData() {
+  let saved = null;
+  try { saved = await chrome.storage.local.get(FILTERS_KEY); } catch (e) {}
+  if (saved && saved[FILTERS_KEY] && typeof saved[FILTERS_KEY] === 'object') {
+    state.filters = Object.assign(state.filters, saved[FILTERS_KEY]);
+    if (!Array.isArray(state.filters.sources)) state.filters.sources = [];
+    if (!Array.isArray(state.filters.contentKinds)) state.filters.contentKinds = [];
+  }
+
   const [clipsRes, settingsRes, sourcesRes] = await Promise.all([
     UI.sendMessage('searchClips', { query: '', filters: {} }),
     UI.sendMessage('getSettings'),
@@ -46,8 +59,31 @@ async function loadData() {
   if (sourcesRes.success) state.sources = sourcesRes.data;
 }
 
+async function persistFilters() {
+  try { await chrome.storage.local.set({ [FILTERS_KEY]: state.filters }); }
+  catch (e) { console.warn('persist filters failed:', e); }
+}
+
+function restoreFilterUI() {
+  document.querySelectorAll('[data-filter-type]').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.filterType === state.filters.type);
+  });
+  const favChip = document.querySelector('[data-filter-fav="only"]');
+  if (favChip) favChip.classList.toggle('active', state.filters.favOnly);
+  const pinChip = document.querySelector('[data-filter-pin="only"]');
+  if (pinChip) pinChip.classList.toggle('active', state.filters.pinOnly);
+}
+
 function applyFilters() {
   let result = [...state.clips];
+  const now = Date.now();
+  const ranges = {
+    '1h': 60 * 60 * 1000,
+    '24h': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+    '90d': 90 * 24 * 60 * 60 * 1000
+  };
 
   if (state.filters.type !== 'all') {
     result = result.filter(c => c.type === state.filters.type);
@@ -58,8 +94,25 @@ function applyFilters() {
   if (state.filters.pinOnly) {
     result = result.filter(c => c.isPinned);
   }
-  if (state.filters.source) {
-    result = result.filter(c => c.sourceHost === state.filters.source || c.sourceApp === state.filters.source);
+  if (state.filters.dateRange !== 'all' && ranges[state.filters.dateRange]) {
+    result = result.filter(c => now - (c.timestamp || 0) <= ranges[state.filters.dateRange]);
+  }
+  if (state.filters.sources && state.filters.sources.length > 0) {
+    result = result.filter(c => {
+      const s = c.sourceHost || c.sourceApp || '';
+      return state.filters.sources.includes(s);
+    });
+  }
+  if (state.filters.contentKinds && state.filters.contentKinds.length > 0) {
+    result = result.filter(c => {
+      const kinds = [];
+      if (c.type === 'image') kinds.push('hasImage');
+      if (c.type === 'code') kinds.push('hasCode');
+      if (c.tags && c.tags.length > 0) kinds.push('hasTags');
+      if (c.isFavorite) kinds.push('hasFav');
+      for (const k of state.filters.contentKinds) if (kinds.includes(k)) return true;
+      return false;
+    });
   }
 
   return result;
@@ -117,23 +170,76 @@ function renderSources() {
   }
   els.sourcesFilter.style.display = 'flex';
   els.sourcesFilter.innerHTML = `<span style="font-weight:500;color:var(--text-secondary);font-size:13px;align-self:center;margin-right:4px;">来源:</span>` +
-    `<span class="filter-chip ${state.filters.source === null ? 'active' : ''}" data-source-clear>全部来源</span>` +
-    state.sources.slice(0, 12).map(s =>
-      `<span class="filter-chip ${state.filters.source === s.name ? 'active' : ''}" data-source="${UI.escapeAttr(s.name)}">
+    `<span class="filter-chip ${state.filters.sources.length === 0 ? 'active' : ''}" data-source-all>全部来源</span>` +
+    state.sources.slice(0, 12).map(s => {
+      const active = state.filters.sources.includes(s.name);
+      return `<span class="filter-chip ${active ? 'active' : ''}" data-source="${UI.escapeAttr(s.name)}">
         ${s.hostname ? '' : '🌐'} ${UI.escapeHtml(s.name)} <span style="opacity:0.7;">(${s.count})</span>
-      </span>`
-    ).join('');
+      </span>`;
+    }).join('');
+}
+
+function renderExtraFilters() {
+  const dateContainer = document.getElementById('dateRangeFilters');
+  if (dateContainer) {
+    const ranges = [
+      { key: 'all', label: '全部时间' },
+      { key: '1h', label: '1小时内' },
+      { key: '24h', label: '24小时内' },
+      { key: '7d', label: '7天内' },
+      { key: '30d', label: '30天内' },
+      { key: '90d', label: '90天内' }
+    ];
+    dateContainer.innerHTML = `<span style="font-weight:500;color:var(--text-secondary);font-size:13px;align-self:center;margin-right:4px;">时间:</span>` +
+      ranges.map(r => `<span class="filter-chip ${state.filters.dateRange === r.key ? 'active' : ''}" data-date-range="${r.key}">${r.label}</span>`).join('');
+    dateContainer.querySelectorAll('[data-date-range]').forEach(chip => {
+      chip.addEventListener('click', async () => {
+        dateContainer.querySelectorAll('[data-date-range]').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        state.filters.dateRange = chip.dataset.dateRange;
+        await persistFilters();
+        renderClips();
+      });
+    });
+  }
+
+  const kindsContainer = document.getElementById('kindFilters');
+  if (kindsContainer) {
+    const kinds = [
+      { key: 'hasImage', label: '🖼️ 含图片' },
+      { key: 'hasCode', label: '💻 含代码' },
+      { key: 'hasTags', label: '🏷️ 带标签' },
+      { key: 'hasFav', label: '⭐ 已收藏' }
+    ];
+    kindsContainer.innerHTML = `<span style="font-weight:500;color:var(--text-secondary);font-size:13px;align-self:center;margin-right:4px;">内容:</span>` +
+      kinds.map(k => `<span class="filter-chip ${state.filters.contentKinds.includes(k.key) ? 'active' : ''}" data-content-kind="${k.key}">${k.label}</span>`).join('');
+    kindsContainer.querySelectorAll('[data-content-kind]').forEach(chip => {
+      chip.addEventListener('click', async () => {
+        const k = chip.dataset.contentKind;
+        const i = state.filters.contentKinds.indexOf(k);
+        if (i >= 0) state.filters.contentKinds.splice(i, 1);
+        else state.filters.contentKinds.push(k);
+        chip.classList.toggle('active');
+        await persistFilters();
+        renderClips();
+      });
+    });
+  }
 }
 
 function renderClips() {
   const filtered = applyFilters();
+  const settingsInfo = state.settings
+    ? (state.settings.enableSensitiveMask ? '隐私遮罩：开启' : '隐私遮罩：关闭')
+    : '设置读取中';
+  const filterDesc = describeFilters();
 
   if (filtered.length === 0) {
     els.timelineContent.innerHTML = `
       <div class="card" style="text-align:center;padding:60px 20px;">
         <div class="empty-icon">📭</div>
         <div class="empty-title">暂无内容</div>
-        <div class="empty-desc">复制一些文本、链接或图片，它们会自动出现在这里</div>
+        <div class="empty-desc">${filterDesc ? filterDesc + '<br>' : ''}复制一些文本、链接或图片，它们会自动出现在这里<br><span style="font-size:12px;color:var(--text-muted);margin-top:8px;display:block;">✅ ${settingsInfo}</span></div>
       </div>`;
     return;
   }
@@ -141,19 +247,36 @@ function renderClips() {
   const groups = groupByDate(filtered);
   const layoutClass = state.layout === 'grid' ? 'grid-layout' : 'list-layout';
 
-  els.timelineContent.innerHTML = groups.map(group => `
-    <div class="timeline-group">
-      <div class="timeline-header">
-        <span class="timeline-date">${group.label}</span>
-        <span class="timeline-count">${group.clips.length} 条</span>
+  els.timelineContent.innerHTML = `
+    ${filterDesc ? `<div class="card" style="margin-bottom:14px;padding:10px 16px;font-size:13px;color:var(--text-secondary);">${filterDesc} · 共 ${filtered.length} 条结果</div>` : ''}
+    ${groups.map(group => `
+      <div class="timeline-group">
+        <div class="timeline-header">
+          <span class="timeline-date">${group.label}</span>
+          <span class="timeline-count">${group.clips.length} 条</span>
+        </div>
+        <div class="${layoutClass}">
+          ${group.clips.map(clip => renderClipCard(clip)).join('')}
+        </div>
       </div>
-      <div class="${layoutClass}">
-        ${group.clips.map(clip => renderClipCard(clip)).join('')}
-      </div>
-    </div>
-  `).join('');
+    `).join('')}
+  `;
 
   attachClipEvents();
+}
+
+function describeFilters() {
+  const parts = [];
+  const rangesLabel = { '1h': '1小时内', '24h': '24小时内', '7d': '7天内', '30d': '30天内', '90d': '90天内' };
+  const kindsLabel = { hasImage: '含图片', hasCode: '含代码', hasTags: '带标签', hasFav: '已收藏' };
+  const typeLabel = { text: '文本', link: '链接', code: '代码', image: '图片' };
+  if (state.filters.type !== 'all') parts.push(`类型: ${typeLabel[state.filters.type] || state.filters.type}`);
+  if (state.filters.dateRange !== 'all') parts.push(`时间: ${rangesLabel[state.filters.dateRange]}`);
+  if (state.filters.sources.length > 0) parts.push(`来源: ${state.filters.sources.join(' / ')}`);
+  if (state.filters.contentKinds.length > 0) parts.push(`内容: ${state.filters.contentKinds.map(k => kindsLabel[k] || k).join(' / ')}`);
+  if (state.filters.favOnly) parts.push('仅收藏');
+  if (state.filters.pinOnly) parts.push('仅置顶');
+  return parts.length > 0 ? '当前筛选 → ' + parts.join(' · ') : '';
 }
 
 function renderClipCard(clip) {
@@ -300,37 +423,46 @@ function updatePauseUI() {
 
 function bindEvents() {
   document.querySelectorAll('[data-filter-type]').forEach(chip => {
-    chip.addEventListener('click', () => {
+    chip.addEventListener('click', async () => {
       document.querySelectorAll('[data-filter-type]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       state.filters.type = chip.dataset.filterType;
+      await persistFilters();
       renderClips();
     });
   });
 
-  document.querySelector('[data-filter-fav="only"]').addEventListener('click', (e) => {
+  document.querySelector('[data-filter-fav="only"]').addEventListener('click', async (e) => {
     e.currentTarget.classList.toggle('active');
     state.filters.favOnly = e.currentTarget.classList.contains('active');
+    await persistFilters();
     renderClips();
   });
 
-  document.querySelector('[data-filter-pin="only"]').addEventListener('click', (e) => {
+  document.querySelector('[data-filter-pin="only"]').addEventListener('click', async (e) => {
     e.currentTarget.classList.toggle('active');
     state.filters.pinOnly = e.currentTarget.classList.contains('active');
+    await persistFilters();
     renderClips();
   });
 
   document.addEventListener('click', (e) => {
-    const sourceClear = e.target.closest('[data-source-clear]');
+    const sourceAll = e.target.closest('[data-source-all]');
     const sourceChip = e.target.closest('[data-source]');
-    if (sourceClear) {
-      state.filters.source = null;
+    if (sourceAll) {
+      state.filters.sources = [];
       renderSources();
       renderClips();
     } else if (sourceChip) {
-      state.filters.source = sourceChip.dataset.source;
-      renderSources();
-      renderClips();
+      const s = sourceChip.dataset.source;
+      const i = state.filters.sources.indexOf(s);
+      if (i >= 0) state.filters.sources.splice(i, 1);
+      else state.filters.sources.push(s);
+      (async () => {
+        await persistFilters();
+        renderSources();
+        renderClips();
+      })();
     }
   });
 

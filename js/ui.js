@@ -238,16 +238,78 @@ const UI = {
     })();
   },
 
-  generateQuoteCard(clip) {
-    const lines = [];
-    lines.push('> 「' + UI.truncate(clip.content || clip.title || '无内容', 100) + '」');
-    lines.push('>');
-    lines.push('> —— 来自 ' + (clip.sourceApp || '未知来源') + (clip.sourceUrl ? ` (${clip.sourceUrl})` : ''));
-    lines.push('> 保存于 ' + UI.formatTimestamp(clip.timestamp));
-    if (clip.tags && clip.tags.length > 0) {
-      lines.push('> 标签: ' + clip.tags.map(t => '#' + t).join(' '));
+  generateQuoteCard(clip, mode = 'full') {
+    const safeTitle = clip.title || '';
+    const safeContent = clip.content || safeTitle || '无内容';
+    const safeSourceApp = clip.sourceApp || '未知来源';
+    const safeSourceHost = clip.sourceHost || '';
+    const safeSourceUrl = clip.sourceUrl || '';
+    const saveTime = UI.formatTimestamp(clip.timestamp);
+
+    if (mode === 'simple') {
+      const lines = [];
+      lines.push('> 「' + UI.truncate(safeContent, 120) + '」');
+      lines.push('>');
+      lines.push('> —— ' + (safeTitle ? safeTitle + ' ' : '') + saveTime);
+      return lines.join('\n');
     }
+
+    if (mode === 'source') {
+      const lines = [];
+      lines.push('> 「' + UI.truncate(safeContent, 120) + '」');
+      lines.push('>');
+      lines.push('> —— 来自 ' + safeSourceApp + (safeSourceHost ? ` (${safeSourceHost})` : ''));
+      if (safeSourceUrl) lines.push('> 🔗 ' + safeSourceUrl);
+      lines.push('> 保存于 ' + saveTime);
+      return lines.join('\n');
+    }
+
+    const lines = [];
+    lines.push('> 「' + UI.truncate(safeContent, 120) + '」');
+    lines.push('>');
+    lines.push('> —— 来自 ' + safeSourceApp + (safeSourceHost ? ` (${safeSourceHost})` : ''));
+    lines.push('> 保存于 ' + saveTime);
+    if (safeSourceUrl) lines.push('> 🔗 ' + safeSourceUrl);
+    if (clip.tags && clip.tags.length > 0) {
+      lines.push('> 🏷️ 标签: ' + clip.tags.map(t => '#' + t).join(' '));
+    }
+    if (safeTitle) lines.push('> 📝 标题: ' + safeTitle);
     return lines.join('\n');
+  },
+
+  diffText(oldText, newText) {
+    const oldLines = (oldText || '').split('\n');
+    const newLines = (newText || '').split('\n');
+    const dp = Array.from({ length: oldLines.length + 1 }, () => new Array(newLines.length + 1).fill(0));
+
+    for (let i = 1; i <= oldLines.length; i++) {
+      for (let j = 1; j <= newLines.length; j++) {
+        dp[i][j] = oldLines[i - 1] === newLines[j - 1]
+          ? dp[i - 1][j - 1] + 1
+          : Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+
+    const diff = [];
+    let i = oldLines.length, j = newLines.length;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+        diff.unshift({ type: 'equal', text: oldLines[i - 1] });
+        i--; j--;
+      } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+        diff.unshift({ type: 'add', text: newLines[j - 1] });
+        j--;
+      } else {
+        diff.unshift({ type: 'del', text: oldLines[i - 1] });
+        i--;
+      }
+    }
+
+    return diff.map(d => {
+      if (d.type === 'equal') return `<div style="padding:2px 8px;color:var(--text-secondary);font-family:monospace;font-size:12px;white-space:pre-wrap;">  ${UI.escapeHtml(d.text || ' ')}</div>`;
+      if (d.type === 'add') return `<div style="padding:2px 8px;background:rgba(22,163,74,0.1);border-left:3px solid #16a34a;color:var(--text-primary);font-family:monospace;font-size:12px;white-space:pre-wrap;">+ ${UI.escapeHtml(d.text || ' ')}</div>`;
+      return `<div style="padding:2px 8px;background:rgba(239,68,68,0.1);border-left:3px solid #ef4444;color:var(--text-primary);font-family:monospace;font-size:12px;white-space:pre-wrap;opacity:0.9;">- ${UI.escapeHtml(d.text || ' ')}</div>`;
+    }).join('');
   },
 
   maskSensitive(text, sensitiveWords) {
